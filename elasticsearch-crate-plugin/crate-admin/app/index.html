@@ -50,14 +50,6 @@
   </div>
   <iframe name="plugin_frame" frameborder="0" height="100%" width="100%"></iframe>
 
-    <!-- Add your site or application content here -->
-
-    <script src="bower_components/angular/angular.js"></script>
-
-    <!-- build:js({.tmp,app}) scripts/scripts.js -->
-    <script src="scripts/app.js"></script>
-    <!-- endbuild -->
-
         <!-- build:js scripts/plugins.js -->
         <script src="bower_components/jquery/jquery.js"></script>
         <script src="bower_components/bootstrap-sass/js/bootstrap-affix.js"></script>
@@ -73,6 +65,15 @@
         <script src="bower_components/bootstrap-sass/js/bootstrap-scrollspy.js"></script>
         <script src="bower_components/bootstrap-sass/js/bootstrap-collapse.js"></script>
         <script src="bower_components/bootstrap-sass/js/bootstrap-tab.js"></script>
+
+        <script type="text/javascript" src="bower_components/ace-builds/src-min-noconflict/ace.js"></script>
+        <script src="bower_components/angular/angular.js"></script>
+        <script src="bower_components/angular-ui-ace/ui-ace.js"></script>
+
+        <!-- build:js({.tmp,app}) scripts/scripts.js -->
+        <script src="scripts/app.js"></script>
+        <!-- endbuild -->
+
         <script src="scripts/directives/health.js"></script>
         <script src="scripts/directives/versions.js"></script>
         <script src="scripts/directives/plugins.js"></script>

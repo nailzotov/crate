@@ -1,6 +1,6 @@
 'use strict';
 
-angular.module('crateAdminApp', [])
+angular.module('crateAdminApp', ['ui.ace'])
   .config(function ($routeProvider) {
     $routeProvider
       .when('/', {

@@ -4,9 +4,7 @@
     <fieldset>
       <legend>SQL Console</legend>
       <p>Enter a select statement to query Crate</p>
-      <textarea ng-model="statement" class="input-xxlarge" rows="8"
-        placeholder="select * from demo">
-      </textarea><br />
+      <div ui-ace="{mode: 'sql'}"></div><br />
 
       <button ng-click="execute()" type="submit" class="btn">Execute Query</button>
     </fieldset>
