@@ -1,4 +1,3 @@
-
 package org.cratedb.core.collections;
 
 import java.util.Collection;
