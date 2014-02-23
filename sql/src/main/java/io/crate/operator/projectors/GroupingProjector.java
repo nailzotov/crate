@@ -87,12 +87,12 @@ public class GroupingProjector implements Projector {
      * @param row
      * @param aggregationCollectors
      */
-    private static void transformToRow(Map.Entry<List<Object>, AggregationState[]> entry,
+    private static void transformToRow(Map.Entry<MultiKey, AggregationState[]> entry,
                                        Object[] row,
                                        AggregationCollector[] aggregationCollectors) {
         int c = 0;
 
-        for (Object o : entry.getKey()) {
+        for (Object o : entry.getKey().key) {
             row[c] = o;
             c++;
         }
@@ -209,10 +209,34 @@ public class GroupingProjector implements Projector {
         }
     }
 
+    private class MultiKey {
+
+        final Object[] key;
+
+        private MultiKey(List<Input<?>> inputs) {
+            key = new Object[inputs.size()];
+            for (int i = 0; i < key.length; i++) {
+                key[i] = inputs.get(i).value();
+            }
+        }
+
+        @Override
+        public boolean equals(Object o) {
+            assert o instanceof MultiKey;
+            return Arrays.equals(key, ((MultiKey)o).key);
+
+        }
+
+        @Override
+        public int hashCode() {
+            return Arrays.hashCode(key);
+        }
+    }
+
     private class ManyKeyGrouper implements Grouper {
 
         private final AggregationCollector[] aggregationCollectors;
-        private final Map<List<Object>, AggregationState[]> result;
+        private final Map<MultiKey, AggregationState[]> result;
         private final List<CollectExpression<?>> collectExpressions;
         private final List<Input<?>> keyInputs;
 
@@ -231,11 +255,7 @@ public class GroupingProjector implements Projector {
                 collectExpression.setNextRow(row);
             }
 
-            // TODO: use something with better equals() performance for the keys
-            List<Object> key = new ArrayList<>(keyInputs.size());
-            for (Input keyInput : keyInputs) {
-                key.add(keyInput.value());
-            }
+            MultiKey key = new MultiKey(keyInputs);
 
             AggregationState[] states = result.get(key);
             if (states == null) {
@@ -265,7 +285,7 @@ public class GroupingProjector implements Projector {
             }
 
             int r = 0;
-            for (Map.Entry<List<Object>, AggregationState[]> entry : result.entrySet()) {
+            for (Map.Entry<MultiKey, AggregationState[]> entry : result.entrySet()) {
                 Object[] row = rows[r];
                 transformToRow(entry, row, aggregationCollectors);
                 if (sendToDownStream) {
@@ -325,11 +345,11 @@ public class GroupingProjector implements Projector {
 
     private static class MultiEntryToRowIterator implements Iterator<Object[]> {
 
-        private final Iterator<Map.Entry<List<Object>, AggregationState[]>> iter;
+        private final Iterator<Map.Entry<MultiKey, AggregationState[]>> iter;
         private final int rowLength;
         private final AggregationCollector[] aggregationCollectors;
 
-        private MultiEntryToRowIterator(Iterator<Map.Entry<List<Object>, AggregationState[]>> iter,
+        private MultiEntryToRowIterator(Iterator<Map.Entry<MultiKey, AggregationState[]>> iter,
                                    int rowLength, AggregationCollector[] aggregationCollectors) {
             this.iter = iter;
             this.rowLength = rowLength;
@@ -343,7 +363,7 @@ public class GroupingProjector implements Projector {
 
         @Override
         public Object[] next() {
-            Map.Entry<List<Object>, AggregationState[]> entry = iter.next();
+            Map.Entry<MultiKey, AggregationState[]> entry = iter.next();
             Object[] row = new Object[rowLength];
             transformToRow(entry, row, aggregationCollectors);
             return row;
