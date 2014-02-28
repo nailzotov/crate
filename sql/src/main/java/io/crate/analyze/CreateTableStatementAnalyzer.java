@@ -20,28 +20,94 @@
  */
 package io.crate.analyze;
 
-import io.crate.sql.tree.AstVisitor;
-import io.crate.sql.tree.CreateTable;
-import io.crate.sql.tree.Node;
-import io.crate.sql.tree.TableElement;
+import com.google.common.collect.ImmutableMap;
+import io.crate.sql.tree.*;
 
-public class CreateTableStatementAnalyzer extends AstVisitor {
+public class CreateTableStatementAnalyzer extends AstVisitor<Void, Void> {
 
     @Override
-    protected Object visitNode(Node node, Object context) {
+    protected Void visitNode(Node node, Void context) {
         throw new RuntimeException(
                 String.format("Encountered node %s but expected a CreateTable node", node));
     }
 
     @Override
-    public Object visitCreateTable(CreateTable node, Object context) {
+    public Void visitCreateTable(CreateTable node, Void context) {
         node.clusteredBy();
         node.name();
         node.replicas();
+
+        ImmutableMap.Builder<String, Object> propertiesBuilder = ImmutableMap.builder();
         for (TableElement tableElement : node.tableElements()) {
+            process(tableElement, context);
+        }
+
+        return null;
+    }
+
+    @Override
+    public Void visitColumnDefinition(ColumnDefinition node, Void context) {
+
+        /**
+         *  _meta : {
+         *      columns: {
+         *          "someColumn": {
+         *              "array": true
+         *          }
+         *      }
+         * }
+         */
+
+        ImmutableMap.builder()
+                .put("type", node.type().name())
+                .put("store", false);
+
+        // TODO: index constraint
+        for (ColumnConstraint columnConstraint : node.constraints()) {
+            process(columnConstraint, context);
 
         }
 
+        switch (node.type().type()) {
+            case PRIMITIVE:
+            case ARRAY:
+                process(node.type(), context);
+                break;
+            case SET:
+                throw new UnsupportedOperationException("the SET type is currently not supported");
+        }
+
+
+        return null;
+    }
+
+    @Override
+    public Void visitColumnType(ColumnType node, Void context) {
+        return super.visitColumnType(node, context);
+    }
+
+    @Override
+    public Void visitObjectColumnType(ObjectColumnType node, Void context) {
+        return super.visitObjectColumnType(node, context);
+    }
+
+    @Override
+    public Void visitCollectionColumnType(CollectionColumnType node, Void context) {
+        return super.visitCollectionColumnType(node, context);
+    }
+
+    @Override
+    public Void visitIndexColumnConstraint(IndexColumnConstraint node, Void context) {
+        return null;
+    }
+
+    @Override
+    public Void visitPrimaryKeyConstraint(PrimaryKeyConstraint node, Void context) {
+        return null;
+    }
+
+    @Override
+    public Void visitPrimaryKeyColumnConstraint(PrimaryKeyColumnConstraint node, Void context) {
         return null;
     }
 }
