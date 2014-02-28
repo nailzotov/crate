@@ -20,24 +20,31 @@
  */
 package io.crate.analyze;
 
-import com.google.common.collect.ImmutableMap;
+import io.crate.metadata.TableIdent;
 import io.crate.sql.tree.*;
 
-public class CreateTableStatementAnalyzer extends AstVisitor<Void, Void> {
+import java.util.HashMap;
+import java.util.Map;
+
+public class CreateTableStatementAnalyzer extends AstVisitor<Void, CreateTableAnalysis> {
 
     @Override
-    protected Void visitNode(Node node, Void context) {
+    protected Void visitNode(Node node, CreateTableAnalysis context) {
         throw new RuntimeException(
                 String.format("Encountered node %s but expected a CreateTable node", node));
     }
 
     @Override
-    public Void visitCreateTable(CreateTable node, Void context) {
-        node.clusteredBy();
-        node.name();
-        node.replicas();
+    public Void visitCreateTable(CreateTable node, CreateTableAnalysis context) {
 
-        ImmutableMap.Builder<String, Object> propertiesBuilder = ImmutableMap.builder();
+        context.table(TableIdent.of(node.name()));
+        context.indexSettingsBuilder().put("number_of_replicas", node.replicas().or(1));
+
+        if (node.clusteredBy().isPresent()) {
+            ClusteredBy clusteredBy = node.clusteredBy().get();
+            context.indexSettingsBuilder().put("number_of_shards", clusteredBy.numberOfShards().or(5));
+        }
+
         for (TableElement tableElement : node.tableElements()) {
             process(tableElement, context);
         }
@@ -46,68 +53,69 @@ public class CreateTableStatementAnalyzer extends AstVisitor<Void, Void> {
     }
 
     @Override
-    public Void visitColumnDefinition(ColumnDefinition node, Void context) {
+    public Void visitColumnDefinition(ColumnDefinition node, CreateTableAnalysis context) {
+        Map<String, Object> metaColumnDefinition = new HashMap<>();
+        Map<String, Object> columnDefinition = new HashMap<>();
+        context.addColumnDefinition(
+                node.ident(),
+                columnDefinition,
+                metaColumnDefinition
+        );
+        columnDefinition.put("store", false);
 
-        /**
-         *  _meta : {
-         *      columns: {
-         *          "someColumn": {
-         *              "array": true
-         *          }
-         *      }
-         * }
-         */
+        if (node.constraints().isEmpty()) { // set default if no constraints
+            columnDefinition.put("index", "not_analyzed");
+        }
 
-        ImmutableMap.builder()
-                .put("type", node.type().name())
-                .put("store", false);
-
-        // TODO: index constraint
         for (ColumnConstraint columnConstraint : node.constraints()) {
             process(columnConstraint, context);
 
         }
 
-        switch (node.type().type()) {
-            case PRIMITIVE:
-            case ARRAY:
-                process(node.type(), context);
-                break;
-            case SET:
-                throw new UnsupportedOperationException("the SET type is currently not supported");
+        process(node.type(), context);
+
+        return null;
+    }
+
+    @Override
+    public Void visitColumnType(ColumnType node, CreateTableAnalysis context) {
+        context.currentMetaColumnDefinition().put("collection_type", null);
+        //context.currentColumnDefinition().put("doc_values", true); // TODO: only if not analyzed
+        context.currentColumnDefinition().put("type", node.type().name());
+
+        return null;
+    }
+
+    @Override
+    public Void visitObjectColumnType(ObjectColumnType node, CreateTableAnalysis context) {
+        return null;
+    }
+
+    @Override
+    public Void visitCollectionColumnType(CollectionColumnType node, CreateTableAnalysis context) {
+        if (node.type() == ColumnType.Type.SET) {
+            throw new UnsupportedOperationException("the SET dataType is currently not supported");
         }
 
+        context.currentMetaColumnDefinition().put("collection_type", "array");
+        context.currentColumnDefinition().put("doc_values", false);
+
 
         return null;
     }
 
     @Override
-    public Void visitColumnType(ColumnType node, Void context) {
-        return super.visitColumnType(node, context);
-    }
-
-    @Override
-    public Void visitObjectColumnType(ObjectColumnType node, Void context) {
-        return super.visitObjectColumnType(node, context);
-    }
-
-    @Override
-    public Void visitCollectionColumnType(CollectionColumnType node, Void context) {
-        return super.visitCollectionColumnType(node, context);
-    }
-
-    @Override
-    public Void visitIndexColumnConstraint(IndexColumnConstraint node, Void context) {
+    public Void visitIndexColumnConstraint(IndexColumnConstraint node, CreateTableAnalysis context) {
         return null;
     }
 
     @Override
-    public Void visitPrimaryKeyConstraint(PrimaryKeyConstraint node, Void context) {
+    public Void visitPrimaryKeyConstraint(PrimaryKeyConstraint node, CreateTableAnalysis context) {
         return null;
     }
 
     @Override
-    public Void visitPrimaryKeyColumnConstraint(PrimaryKeyColumnConstraint node, Void context) {
+    public Void visitPrimaryKeyColumnConstraint(PrimaryKeyColumnConstraint node, CreateTableAnalysis context) {
         return null;
     }
 }

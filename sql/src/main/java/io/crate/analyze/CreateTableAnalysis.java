@@ -26,15 +26,44 @@ import io.crate.metadata.TableIdent;
 import io.crate.metadata.table.SchemaInfo;
 import io.crate.metadata.table.TableInfo;
 import org.cratedb.sql.TableAlreadyExistsException;
+import org.elasticsearch.common.settings.ImmutableSettings;
+
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.Map;
 
 public class CreateTableAnalysis extends AbstractDDLAnalysis {
 
     private TableIdent tableIdent;
     private final ReferenceInfos referenceInfos;
+    private final ImmutableSettings.Builder indexSettingsBuilder = ImmutableSettings.builder();
+    private final ImmutableSettings.Builder mappingPropertiesBuilder = ImmutableSettings.builder();
+
+
+    /**
+     *  _meta : {
+     *      columns: {
+     *          "someColumn": {
+     *              "array": true
+     *          }
+     *      },
+     *      primary_keys: [ ... ]
+     * }
+     */
+    private final Map<String, Object> crateMeta;
+    private final Map<String, Object> metaColumns;
+
+    private Map<String, Object> currentColumnDefinition;
+    private Map<String, Object> currentMetaColumnDefinition;
 
     public CreateTableAnalysis(ReferenceInfos referenceInfos, Object[] params) {
         super(params);
         this.referenceInfos = referenceInfos;
+
+        crateMeta = new HashMap<>();
+        crateMeta.put("primary_keys", new ArrayList<String>());
+        metaColumns = new HashMap<>();
+        crateMeta.put("columns", metaColumns);
     }
 
     @Override
@@ -63,5 +92,26 @@ public class CreateTableAnalysis extends AbstractDDLAnalysis {
     @Override
     public void normalize() {
 
+    }
+
+    public ImmutableSettings.Builder indexSettingsBuilder() {
+        return indexSettingsBuilder;
+    }
+
+    public void addColumnDefinition(String columnName,
+                                    Map<String, Object> columnDefinition,
+                                    Map<String, Object> metaColumnDefinition) {
+        currentColumnDefinition = columnDefinition;
+        currentMetaColumnDefinition = metaColumnDefinition;
+        mappingPropertiesBuilder.put(columnName, columnDefinition);
+        metaColumns.put(columnName, metaColumnDefinition);
+    }
+
+    public Map<String, Object> currentColumnDefinition() {
+        return currentColumnDefinition;
+    }
+
+    public Map<String, Object> currentMetaColumnDefinition() {
+        return currentMetaColumnDefinition;
     }
 }
