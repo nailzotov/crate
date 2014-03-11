@@ -38,7 +38,7 @@ import static org.hamcrest.Matchers.arrayContaining;
 import static org.hamcrest.Matchers.is;
 
 
-@CrateIntegrationTest.ClusterScope(scope = CrateIntegrationTest.Scope.GLOBAL)
+@CrateIntegrationTest.ClusterScope(scope = CrateIntegrationTest.Scope.SUITE)
 public class InformationSchemaTest extends SQLTransportIntegrationTest {
 
     static Joiner dotJoiner = Joiner.on('.');
@@ -79,14 +79,15 @@ public class InformationSchemaTest extends SQLTransportIntegrationTest {
     @Test
     public void testDefaultTables() throws Exception {
         execute("select * from information_schema.tables order by schema_name, table_name");
-        assertEquals(6L, response.rowCount());
+        assertEquals(7L, response.rowCount());
 
         assertArrayEquals(response.rows()[0], new Object[]{"information_schema", "columns", 1, "0", null});
-        assertArrayEquals(response.rows()[1], new Object[]{"information_schema", "table_constraints", 1, "0", null});
-        assertArrayEquals(response.rows()[2], new Object[]{"information_schema", "tables", 1, "0", null});
-        assertArrayEquals(response.rows()[3], new Object[]{"sys", "cluster", 1, "0", null});
-        assertArrayEquals(response.rows()[4], new Object[]{"sys", "nodes", 1, "0", null});
-        assertArrayEquals(response.rows()[5], new Object[]{"sys", "shards", 1, "0", null});
+        assertArrayEquals(response.rows()[1], new Object[]{"information_schema", "routines", 1, "0", null});
+        assertArrayEquals(response.rows()[2], new Object[]{"information_schema", "table_constraints", 1, "0", null});
+        assertArrayEquals(response.rows()[3], new Object[]{"information_schema", "tables", 1, "0", null});
+        assertArrayEquals(response.rows()[4], new Object[]{"sys", "cluster", 1, "0", null});
+        assertArrayEquals(response.rows()[5], new Object[]{"sys", "nodes", 1, "0", null});
+        assertArrayEquals(response.rows()[6], new Object[]{"sys", "shards", 1, "0", null});
     }
 
     @Test
@@ -94,7 +95,7 @@ public class InformationSchemaTest extends SQLTransportIntegrationTest {
         serviceSetup();
 
         execute("select * from information_schema.tables");
-        assertEquals(9L, response.rowCount());
+        assertEquals(10L, response.rowCount());
 
         client().execute(SQLAction.INSTANCE,
             new SQLRequest("create table t4 (col1 integer, col2 string)")).actionGet();
@@ -104,7 +105,7 @@ public class InformationSchemaTest extends SQLTransportIntegrationTest {
         Thread.sleep(10);
 
         execute("select * from information_schema.tables");
-        assertEquals(10L, response.rowCount());
+        assertEquals(11L, response.rowCount());
     }
 
 
@@ -267,7 +268,6 @@ public class InformationSchemaTest extends SQLTransportIntegrationTest {
         assertThat(commaJoiner.join((Collection<?>) response.rows()[1][1]), is("col1a"));
     }
 
-    /* TODO: enable when other information schema tables are implemented
     @Test
     public void testSelectFromRoutines() throws Exception {
         String stmt1 = "CREATE ANALYZER myAnalyzer WITH (" +
@@ -285,29 +285,21 @@ public class InformationSchemaTest extends SQLTransportIntegrationTest {
                 "  stopwords=[?, ?, ?]" +
                 ")", new Object[]{"der", "die", "das"});
         ensureGreen();
-        execute("SELECT * from INFORMATION_SCHEMA.routines where routine_definition != " +
-                "'BUILTIN' order by routine_name asc");
+        execute("SELECT * from INFORMATION_SCHEMA.routines where not builtin" +
+                " and routine_type = 'ANALYZER'" +
+                " order by routine_name asc");
         assertEquals(2L, response.rowCount());
 
         assertEquals("myanalyzer", response.rows()[0][0]);
         assertEquals("ANALYZER", response.rows()[0][1]);
-        assertEquals("CREATE ANALYZER myanalyzer WITH (TOKENIZER whitespace, " +
-                "TOKEN_FILTERS WITH (" +
-                "mytokenfilter WITH (\"language\"='german',\"type\"='snowball'), kstem)" +
-                ")", response.rows()[0][2]);
-
         assertEquals("myotheranalyzer", response.rows()[1][0]);
         assertEquals("ANALYZER", response.rows()[1][1]);
-        assertEquals(
-                "CREATE ANALYZER myotheranalyzer EXTENDS german WITH (\"stopwords\"=['der','die','das'])",
-                response.rows()[1][2]
-        );
     }
 
     @Test
     public void testSelectBuiltinAnalyzersFromRoutines() throws Exception {
         execute("SELECT routine_name from INFORMATION_SCHEMA.routines WHERE " +
-               "\"routine_type\"='ANALYZER' AND \"routine_definition\"='BUILTIN' order by " +
+               "routine_type='ANALYZER' AND builtin order by " +
                 "routine_name desc");
         assertEquals(42L, response.rowCount());
         String[] analyzerNames = new String[response.rows().length];
@@ -328,7 +320,7 @@ public class InformationSchemaTest extends SQLTransportIntegrationTest {
     @Test
     public void testSelectBuiltinTokenizersFromRoutines() throws Exception {
         execute("SELECT routine_name from INFORMATION_SCHEMA.routines WHERE " +
-                "\"routine_type\"='TOKENIZER' AND \"routine_definition\"='BUILTIN' order by " +
+                "routine_type='TOKENIZER' AND builtin order by " +
                 "routine_name asc");
         assertEquals(13L, response.rowCount());
         String[] tokenizerNames = new String[response.rows().length];
@@ -345,22 +337,23 @@ public class InformationSchemaTest extends SQLTransportIntegrationTest {
     @Test
     public void testSelectBuiltinTokenFiltersFromRoutines() throws Exception {
         execute("SELECT routine_name from INFORMATION_SCHEMA.routines WHERE " +
-                "\"routine_type\"='TOKEN_FILTER' AND \"routine_definition\"='BUILTIN' order by " +
+                "routine_type='TOKEN_FILTER' AND builtin order by " +
                 "routine_name asc");
-        assertEquals(44L, response.rowCount());
+        assertEquals(46L, response.rowCount());
         String[] tokenFilterNames = new String[response.rows().length];
         for (int i=0; i<response.rowCount(); i++) {
             tokenFilterNames[i] = (String)response.rows()[i][0];
         }
         assertEquals(
                 "arabic_normalization, arabic_stem, asciifolding, brazilian_stem, cjk_bigram, " +
-                "cjk_width, classic, common_grams, czech_stem, dictionary_decompounder, " +
-                "dutch_stem, edgeNGram, edge_ngram, elision, french_stem, german_stem, hunspell, " +
-                "hyphenation_decompounder, keep, keyword_marker, keyword_repeat, kstem, " +
-                "length, lowercase, nGram, ngram, pattern_capture, pattern_replace, " +
-                "persian_normalization, porter_stem, reverse, russian_stem, shingle, " +
-                "snowball, standard, stemmer, stemmer_override, stop, synonym, trim, " +
-                "truncate, type_as_payload, unique, word_delimiter",
+                "cjk_width, classic, common_grams, czech_stem, delimited_payload_filter, " +
+                "dictionary_decompounder, dutch_stem, edgeNGram, edge_ngram, elision, " +
+                "french_stem, german_stem, hunspell, hyphenation_decompounder, keep, " +
+                "keyword_marker, keyword_repeat, kstem, length, limit, lowercase, nGram, " +
+                "ngram, pattern_capture, pattern_replace, persian_normalization, " +
+                "porter_stem, reverse, russian_stem, shingle, snowball, standard, stemmer, " +
+                "stemmer_override, stop, synonym, trim, truncate, type_as_payload, " +
+                "unique, word_delimiter",
                 Joiner.on(", ").join(tokenFilterNames)
         );
     }
@@ -368,7 +361,7 @@ public class InformationSchemaTest extends SQLTransportIntegrationTest {
     @Test
     public void testSelectBuiltinCharFiltersFromRoutines() throws Exception {
         execute("SELECT routine_name from INFORMATION_SCHEMA.routines WHERE " +
-                "\"routine_type\"='CHAR_FILTER' AND \"routine_definition\"='BUILTIN' order by " +
+                "routine_type='CHAR_FILTER' AND builtin order by " +
                 "routine_name asc");
         assertEquals(4L, response.rowCount());
         String[] charFilterNames = new String[response.rows().length];
@@ -381,6 +374,74 @@ public class InformationSchemaTest extends SQLTransportIntegrationTest {
         );
     }
 
+    @Test
+    public void testSelectBuiltinFunctions() throws Exception {
+        execute("SELECT routine_definition from INFORMATION_SCHEMA.routines WHERE " +
+                "routine_type='FUNCTION' AND builtin order by " +
+                "routine_definition asc");
+        assertEquals(157L, response.rowCount());
+        String[] functionDefinitions = new String[response.rows().length];
+        for (int i=0; i<response.rowCount(); i++) {
+            functionDefinitions[i] = (String)response.rows()[i][0];
+        }
+
+        assertEquals(
+                "any(boolean), any(byte), any(double), any(float), any(integer), " +
+                "any(ip), any(long), any(short), any(string), any(timestamp), " +
+                "avg(byte), avg(double), avg(float), avg(integer), avg(long), " +
+                "avg(short), collect_set(boolean), collect_set(double), " +
+                "collect_set(float), collect_set(integer), collect_set(ip), " +
+                "collect_set(long), collect_set(short), collect_set(string), " +
+                "collect_set(timestamp), collection_avg(byte_set), " +
+                "collection_avg(double_set), collection_avg(float_set), " +
+                "collection_avg(integer_set), collection_avg(long_set), " +
+                "collection_avg(short_set), collection_count(boolean_set), " +
+                "collection_count(byte_set), collection_count(double_set), " +
+                "collection_count(float_set), collection_count(integer_set), " +
+                "collection_count(ip_set), collection_count(long_set), " +
+                "collection_count(null_set), collection_count(object_set), " +
+                "collection_count(short_set), collection_count(string_set), " +
+                "collection_count(timestamp_set), count(), count(boolean), " +
+                "count(byte), count(double), count(float), count(integer), " +
+                "count(ip), count(long), count(null), count(object), count(short), " +
+                "count(string), count(timestamp), date_trunc(string, string, timestamp), " +
+                "date_trunc(string, timestamp), max(double), max(float), max(integer), " +
+                "max(ip), max(long), max(short), max(string), max(timestamp), min(double), " +
+                "min(float), min(integer), min(ip), min(long), min(short), min(string), " +
+                "min(timestamp), op_<(boolean, boolean), op_<(byte, byte), " +
+                "op_<(double, double), op_<(float, float), op_<(integer, integer), " +
+                "op_<(ip, ip), op_<(long, long), op_<(short, short), op_<(string, string), " +
+                "op_<(timestamp, timestamp), op_<=(boolean, boolean), op_<=(byte, byte), " +
+                "op_<=(double, double), op_<=(float, float), op_<=(integer, integer), " +
+                "op_<=(ip, ip), op_<=(long, long), op_<=(short, short), " +
+                "op_<=(string, string), op_<=(timestamp, timestamp), " +
+                "op_=(boolean, boolean), op_=(byte, byte), op_=(double, double), " +
+                "op_=(float, float), op_=(integer, integer), op_=(ip, ip), " +
+                "op_=(long, long), op_=(object, object), op_=(short, short), " +
+                "op_=(string, string), op_=(timestamp, timestamp), op_>(boolean, boolean), " +
+                "op_>(byte, byte), op_>(double, double), op_>(float, float), " +
+                "op_>(integer, integer), op_>(ip, ip), op_>(long, long), " +
+                "op_>(short, short), op_>(string, string), op_>(timestamp, timestamp), " +
+                "op_>=(boolean, boolean), op_>=(byte, byte), op_>=(double, double), " +
+                "op_>=(float, float), op_>=(integer, integer), op_>=(ip, ip), " +
+                "op_>=(long, long), op_>=(short, short), op_>=(string, string), " +
+                "op_>=(timestamp, timestamp), op_and(boolean, boolean), " +
+                "op_in(boolean, boolean_set), op_in(byte, byte_set), " +
+                "op_in(double, double_set), op_in(float, float_set), " +
+                "op_in(integer, integer_set), op_in(ip, ip_set), op_in(long, long_set), " +
+                "op_in(object, object_set), op_in(short, short_set), " +
+                "op_in(string, string_set), op_in(timestamp, timestamp_set), " +
+                "op_isnull(boolean), op_isnull(byte), op_isnull(double), " +
+                "op_isnull(float), op_isnull(integer), op_isnull(ip), " +
+                "op_isnull(long), op_isnull(null), op_isnull(short), " +
+                "op_isnull(string), op_isnull(timestamp), op_like(string, string), " +
+                "op_not(boolean), op_or(boolean, boolean), sum(byte), sum(double), " +
+                "sum(float), sum(integer), sum(long), sum(short)",
+                Joiner.on(", ").join(functionDefinitions)
+        );
+    }
+
+    /* TODO: enable when other information schema tables are implemented
     @Test
     public void testTableConstraintsWithOrderBy() throws Exception {
         execute("create table test1 (col11 integer primary key, col12 float)");
@@ -400,7 +461,7 @@ public class InformationSchemaTest extends SQLTransportIntegrationTest {
     @Test
     public void testDefaultColumns() throws Exception {
         execute("select * from information_schema.columns order by schema_name, table_name");
-        assertEquals(45L, response.rowCount());
+        assertEquals(49L, response.rowCount());
     }
 
     @Test
@@ -585,7 +646,7 @@ public class InformationSchemaTest extends SQLTransportIntegrationTest {
         ensureYellow();
         execute("select count(*) from information_schema.tables");
         assertEquals(1, response.rowCount());
-        assertEquals(9L, response.rows()[0][0]); // 3 + 5
+        assertEquals(10L, response.rows()[0][0]); // 3 + 5
     }
 
     @Test

@@ -23,6 +23,7 @@ package io.crate.planner.symbol;
 
 import com.google.common.base.Joiner;
 import com.google.common.collect.ImmutableList;
+import io.crate.metadata.FunctionInfo;
 import io.crate.metadata.doc.DocSchemaInfo;
 import org.apache.lucene.util.BytesRef;
 
@@ -68,11 +69,17 @@ public class SymbolFormatter extends SymbolVisitor<Void, String> {
 
     @Override
     public String visitFunction(Function symbol, Void context) {
-        return format("%s(%s)",
-                symbol.info().ident().name(), argJoiner.join(symbol.info().ident().argumentTypes()));
+        return FunctionFormatter.format(symbol.info());
     }
 
-    @Override
+    public static class FunctionFormatter {
+        public static String format(FunctionInfo info) {
+            return SymbolFormatter.format("%s(%s)",
+                    info.ident().name(), argJoiner.join(info.ident().argumentTypes()));
+        }
+    }
+
+     @Override
     public String visitReference(Reference symbol, Void context) {
         StringBuilder builder = new StringBuilder();
         String schema = symbol.info().ident().tableIdent().schema();
