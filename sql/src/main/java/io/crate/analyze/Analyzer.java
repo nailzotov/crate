@@ -83,6 +83,7 @@ public class Analyzer {
         private final AbstractStatementAnalyzer dropBlobTableStatementAnalyzer = new DropBlobTableStatementAnalyzer();
         private final AbstractStatementAnalyzer refreshTableAnalyzer = new RefreshTableAnalyzer();
         private final AbstractStatementAnalyzer alterTableAnalyzer = new AlterTableAnalyzer();
+        private final AbstractStatementAnalyzer alterBlobTableAnalyzer = new AlterBlobTableAnalyzer();
 
         public AnalyzerDispatcher(ReferenceInfos referenceInfos,
                                   Functions functions,
